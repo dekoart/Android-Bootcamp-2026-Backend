@@ -82,6 +82,4 @@ public class JwtUtil {
     private String readResourceToString(Resource resource) throws IOException {
         return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
     }
-
-
 }

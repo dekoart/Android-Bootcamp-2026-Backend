@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserDetailsServiceImpl userDetailsService;
 
     /**
-     * Фильтр проверяет access token из заголовка Authorization и, если он валиден,
+     * Фильтр проверяе access token из заголовка Authorization и, если он валиден,
      * устанавливает Authentication в SecurityContext.
      */
     @Override
