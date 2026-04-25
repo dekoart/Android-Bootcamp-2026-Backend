@@ -1,0 +1,942 @@
+openapi: 3.0.3
+info:
+  title: Android Bootcamp 2026 — Bunch API
+  description: |
+    REST API for the **Bunch** meeting-scheduling application.
+
+    ### Authentication
+    Most endpoints require a valid JWT **access token** supplied in the
+    `Authorization: Bearer <accessToken>` header.
+
+    Use `POST /api/v1/auth/login` or `POST /api/v1/auth/register` to obtain tokens.
+    When the access token expires, call `POST /api/v1/auth/refresh` with the
+    **refresh token** in the same `Authorization: Bearer` header to get a new pair.
+  version: 1.0.0
+  contact:
+    name: SI Campus Bootcamp 2026
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Service availability check
+  - name: Auth
+    description: Registration, login, logout and token refresh
+  - name: Meetings
+    description: Creating and managing meetings
+  - name: Invitations
+    description: Viewing and responding to meeting invitations
+  - name: Profile
+    description: User profile management
+
+# ─────────────────────────────────────────────────────────────
+# Security
+# ─────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from /api/v1/auth/login or /api/v1/auth/register
+
+  # ── Reusable schemas ────────────────────────────────────────
+  schemas:
+
+    # ── Requests ────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: john_doe
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: john@example.com
+        password:
+          type: string
+          minLength: 6
+          maxLength: 255
+          format: password
+          example: secret123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: john@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 255
+          example: secret123
+
+    CreateMeetingRequest:
+      type: object
+      required: [title, startTime, endTime, participantIds]
+      properties:
+        title:
+          type: string
+          maxLength: 50
+          example: Weekly sync
+        description:
+          type: string
+          maxLength: 2048
+          example: Discuss sprint goals
+        location:
+          type: string
+          maxLength: 255
+          example: Conference room A
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T10:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T11:00:00Z"
+        participantIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          example:
+            - "550e8400-e29b-41d4-a716-446655440001"
+            - "550e8400-e29b-41d4-a716-446655440002"
+
+    FreeTimeRequest:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          example:
+            - "550e8400-e29b-41d4-a716-446655440001"
+            - "550e8400-e29b-41d4-a716-446655440002"
+
+    InvitationActionRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/ParticipantStatus'
+
+    UserProfileRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 50
+          example: john_doe
+        avatarUrl:
+          type: string
+          maxLength: 2048
+          example: "https://cdn.example.com/avatars/john.png"
+
+    UpdateAvatarRequest:
+      type: object
+      required: [avatarUrl]
+      properties:
+        avatarUrl:
+          type: string
+          maxLength: 2048
+          example: "https://cdn.example.com/avatars/john.png"
+
+    ResetPasswordRequest:
+      type: object
+      required: [currentPassword, newPassword, confirmPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          example: oldSecret123
+        newPassword:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 255
+          example: newSecret456
+        confirmPassword:
+          type: string
+          format: password
+          example: newSecret456
+
+    # ── Responses ────────────────────────────────────────────
+    AuthResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        username:
+          type: string
+          example: john_doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        accessToken:
+          type: string
+          example: "eyJhbGciOiJSUzI1NiJ9..."
+        refreshToken:
+          type: string
+          example: "eyJhbGciOiJSUzI1NiJ9..."
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+          example: "2026-04-25T10:05:00Z"
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+          example: "2026-05-02T10:00:00Z"
+
+    MeetingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a3bb189e-8bf9-3888-9912-ace4e6543002"
+        organizerId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        organizerUsername:
+          type: string
+          example: john_doe
+        title:
+          type: string
+          example: Weekly sync
+        description:
+          type: string
+          example: Discuss sprint goals
+        location:
+          type: string
+          example: Conference room A
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T10:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T11:00:00Z"
+        status:
+          $ref: '#/components/schemas/MeetingStatus'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-25T09:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-04-25T09:00:00Z"
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantResponse'
+
+    ParticipantResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        username:
+          type: string
+          example: jane_doe
+        status:
+          $ref: '#/components/schemas/ParticipantStatus'
+
+    InvitationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "b2cc290f-9cg0-4999-0023-bdf5f7654113"
+        meetingId:
+          type: string
+          format: uuid
+          example: "a3bb189e-8bf9-3888-9912-ace4e6543002"
+        meetingTitle:
+          type: string
+          example: Weekly sync
+        meetingDescription:
+          type: string
+          example: Discuss sprint goals
+        meetingLocation:
+          type: string
+          example: Conference room A
+        meetingStartTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T10:00:00Z"
+        meetingEndTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T11:00:00Z"
+        organizerUsername:
+          type: string
+          example: john_doe
+        status:
+          $ref: '#/components/schemas/ParticipantStatus'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-25T09:00:00Z"
+
+    UserProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        username:
+          type: string
+          example: john_doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        avatarUrl:
+          type: string
+          example: "https://cdn.example.com/avatars/john.png"
+
+    FreeTimeResponse:
+      type: object
+      properties:
+        startEndTime:
+          type: array
+          items:
+            $ref: '#/components/schemas/FreeTimeSlot'
+
+    FreeTimeSlot:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T09:00:00Z"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-05-01T10:00:00Z"
+
+    PageMetadata:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+        size:
+          type: integer
+          example: 10
+        number:
+          type: integer
+          example: 0
+
+    PageMeetingResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MeetingResponse'
+
+    PageUserProfileResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserProfileResponse'
+
+    # ── Enums ────────────────────────────────────────────────
+    MeetingStatus:
+      type: string
+      enum: [SCHEDULED, CANCELLED, COMPLETED]
+      example: SCHEDULED
+
+    ParticipantStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, DECLINED]
+      example: PENDING
+
+    # ── Errors ───────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Validation failed
+
+  # ── Reusable responses ─────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Validation error or malformed request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The authenticated user is not allowed to perform this action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Scheduling conflict — the time slot overlaps an existing meeting
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Reusable parameters ────────────────────────────────────
+  parameters:
+    MeetingIdPath:
+      name: meetingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique identifier of the meeting
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+      description: Zero-based page index
+    SizeParam:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: Number of items per page
+    SortParam:
+      name: sort
+      in: query
+      schema:
+        type: string
+      description: "Sort field and direction, e.g. `startTime,desc`"
+
+# ─────────────────────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────────────────────
+paths:
+
+  # ── Health ────────────────────────────────────────────────
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns the current service status and server timestamp. No authentication required.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+                  timestamp:
+                    type: string
+                    example: "1745575807000"
+
+  # ── Auth ─────────────────────────────────────────────────
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Creates a new user account and returns a JWT access/refresh token pair.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email is already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate (login)
+      description: Validates credentials and returns a JWT access/refresh token pair.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Invalidates the current user's refresh token on the server. The client should discard both tokens.
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Logged out successfully (no content)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: |
+        Exchange a valid **refresh token** for a new access/refresh token pair.
+        Pass the refresh token in the `Authorization: Bearer <refreshToken>` header.
+      operationId: refreshToken
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Meetings ─────────────────────────────────────────────
+  /api/v1/meetings:
+    get:
+      tags: [Meetings]
+      summary: List meetings for the current user
+      description: |
+        Returns a paginated list of meetings the authenticated user is involved in
+        (either as organizer or participant).
+        Optionally filter by status.
+      operationId: getUserMeetings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/MeetingStatus'
+          description: Filter by meeting status
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Paginated list of meetings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageMeetingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Meetings]
+      summary: Create a new meeting
+      description: |
+        Creates a meeting with the authenticated user as organizer.
+        Each participant listed in `participantIds` receives a `PENDING` invitation.
+      operationId: createMeeting
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMeetingRequest'
+      responses:
+        '201':
+          description: Meeting created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/meetings/{meetingId}:
+    get:
+      tags: [Meetings]
+      summary: Get meeting by ID
+      description: Returns full details of a single meeting, including all participants.
+      operationId: getMeetingById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeetingIdPath'
+      responses:
+        '200':
+          description: Meeting details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Meetings]
+      summary: Delete a meeting
+      description: Permanently deletes a meeting. Only the organizer can delete a meeting.
+      operationId: deleteMeeting
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeetingIdPath'
+      responses:
+        '204':
+          description: Meeting deleted (no content)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/meetings/{meetingId}/cancel:
+    put:
+      tags: [Meetings]
+      summary: Cancel a meeting
+      description: Sets the meeting status to `CANCELLED`. Only the organizer can cancel a meeting.
+      operationId: cancelMeeting
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeetingIdPath'
+      responses:
+        '200':
+          description: Meeting cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/meetings/freeTime:
+    post:
+      tags: [Meetings]
+      summary: Find common free time slots
+      description: |
+        Finds 60-minute time windows during which **all** specified users
+        have no scheduled meetings.
+      operationId: getFreeTime
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreeTimeRequest'
+      responses:
+        '200':
+          description: List of available time slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreeTimeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Invitations ──────────────────────────────────────────
+  /api/v1/invitations:
+    get:
+      tags: [Invitations]
+      summary: List invitations for the current user
+      description: Returns all active invitations (meetings where the user is a participant).
+      operationId: getInvitations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvitationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/invitations/{meetingId}:
+    get:
+      tags: [Invitations]
+      summary: Get invitation details
+      description: Returns the invitation for the current user for the specified meeting.
+      operationId: getInvitationDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeetingIdPath'
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/invitations/{meetingId}/respond:
+    put:
+      tags: [Invitations]
+      summary: Accept or decline an invitation
+      description: |
+        Allows the invited user to respond to a meeting invitation by setting their
+        participant status to `CONFIRMED` or `DECLINED`.
+      operationId: respondToInvitation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MeetingIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationActionRequest'
+      responses:
+        '200':
+          description: Invitation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Profile ──────────────────────────────────────────────
+  /api/v1/profile:
+    get:
+      tags: [Profile]
+      summary: Get current user's profile
+      description: Returns the authenticated user's profile information.
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Profile]
+      summary: Update current user's profile
+      description: Updates the username and/or avatar URL of the authenticated user.
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileRequest'
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/profile/reset-password:
+    put:
+      tags: [Profile]
+      summary: Reset password
+      description: |
+        Changes the authenticated user's password.
+
+        > **Note:** This endpoint is currently **not implemented** and will return
+        > `501 Not Implemented`.
+      operationId: resetPassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '204':
+          description: Password changed successfully (no content)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '501':
+          description: Not implemented
+
+  /api/v1/profile/avatar:
+    put:
+      tags: [Profile]
+      summary: Update avatar URL
+      description: Sets a new avatar URL for the authenticated user.
+      operationId: updateAvatar
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAvatarRequest'
+      responses:
+        '200':
+          description: Updated user profile with new avatar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/profile/public/all:
+    get:
+      tags: [Profile]
+      summary: List all users
+      description: |
+        Returns a paginated list of all registered users.
+        Useful for searching participants when creating a meeting.
+        The current user is excluded from the list.
+      operationId: getAllUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUserProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
